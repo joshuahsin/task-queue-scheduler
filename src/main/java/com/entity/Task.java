@@ -8,33 +8,20 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 
-enum PriorityType {
-    HIGH_PRIORITY,
-    DEFAULT_PRIORITY
-}
+import com.enums.Enums.PriorityType;
+import com.enums.Enums.TaskType;
+import com.enums.Enums.TaskStatus;
 
-enum TaskType {
-    SIMULATED_WORK,
-    SEND_EMAIL
-}
-
-enum TaskStatus {
-    SCHEDULED,   // scheduled_at is in the future, sitting in Redis sorted set
-    QUEUED,      // on the broker (SQS/Redis Stream), ready for a worker to claim
-    RUNNING,     // a worker has claimed it and is actively executing
-    SUCCESS,     // terminal — completed without error
-    FAILED,      // execution threw an exception, eligible for retry evaluation
-    RETRYING,    // backoff period in progress, waiting to re-enter QUEUED
-    DEAD,        // terminal — retry_count reached max_retries, moved to DLQ
-    CANCELLED    // terminal — admin-initiated cancellation
-}
-
+@Entity
+@Table(name = "tasks")
 public class Task {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

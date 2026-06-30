@@ -4,11 +4,7 @@ import java.util.UUID;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-
-enum Tier {
-    FREE,
-    PREMIUM
-}
+import com.enums.Enums.Tier;
 
 @Entity
 @Table(name = "plans")

@@ -6,11 +6,7 @@ import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-
-enum ApiKeyStatus {
-    ACTIVE,
-    INACTIVE
-}
+import com.enums.Enums.ApiKeyStatus;
 
 @Entity
 @Table(name = "api_keys")

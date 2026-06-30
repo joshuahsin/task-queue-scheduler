@@ -10,17 +10,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-
-enum Status {
-    RUNNING,
-    SUCCESS,
-    FAILED
-}
-
-enum ErrorType {
-    TRANSIENT,
-    PERMANENT
-}
+import com.enums.Enums.TaskExecutionStatus;
+import com.enums.Enums.ErrorType;
 
 @Entity
 @Table(name = "task_executions")
@@ -36,7 +27,7 @@ class TaskExecution {
     private Instant finishedAt;
 
     @Enumerated(EnumType.STRING)
-    private Status status;
+    private TaskExecutionStatus status;
 
     @Enumerated(EnumType.STRING)
     private ErrorType errorType;
