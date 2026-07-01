@@ -3,7 +3,8 @@ package com.entity;
 import java.time.Instant;
 import java.util.UUID;
 
-import jakarta.persistence.Column;
+import com.enums.Enums.UserRole;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -11,23 +12,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import com.enums.Enums.ApiKeyStatus;
-
 @Entity
-@Table(name = "api_keys")
+@Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-class ApiKey {
-    private UUID id;
-
-    @Column(name = "tenant_id", nullable = false)
+public class User {
+    private UUID userId;
     private UUID tenantId;
-    
-    private String name;
-    private String keyHash;
-    private ApiKeyStatus status;
+    private String email;
+    private String passwordHash;
+    private UserRole role;
     private Instant createdAt;
-    private Instant expiresAt;
 }

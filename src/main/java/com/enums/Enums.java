@@ -43,4 +43,20 @@ public class Enums {
         TRANSIENT,
         PERMANENT
     }
+
+    public enum UserRole {
+        ADMIN,
+        USER
+    }
+
+    public enum PlanTier {
+        FREE,
+        PREMIUM
+    }
+
+    public enum QueueType {
+        HIGH_PRIORITY,
+        DEFAULT_PRIORITY,
+        DEAD_LETTER_QUEUE
+    }
 }

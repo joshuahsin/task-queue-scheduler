@@ -10,12 +10,21 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import com.enums.Enums.TaskExecutionStatus;
 import com.enums.Enums.ErrorType;
 
 @Entity
 @Table(name = "task_executions")
-class TaskExecution {
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class TaskExecution {
     private UUID id;
 
     @Column(name = "task_id", nullable = false)

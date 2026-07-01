@@ -10,6 +10,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 enum TenantStatus {
     ACTIVE,
@@ -18,6 +22,10 @@ enum TenantStatus {
 
 @Entity
 @Table(name = "tenants")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Tenant {
     private UUID id;
     private String name;

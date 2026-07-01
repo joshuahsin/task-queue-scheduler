@@ -13,8 +13,11 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import com.enums.Enums.PriorityType;
 import com.enums.Enums.TaskType;
@@ -22,6 +25,10 @@ import com.enums.Enums.TaskStatus;
 
 @Entity
 @Table(name = "tasks")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Task {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
