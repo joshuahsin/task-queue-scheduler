@@ -15,17 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-enum QueueType {
-    HIGH,
-    DEFAULT,
-    DLQ
-}
-
-enum WorkerStatus {
-    ONLINE,
-    OFFLINE,
-    UNHEALTHY
-}
+import com.enums.Enums.QueueType;
+import com.enums.Enums.WorkerStatus;
 
 @Entity
 @Table(name = "workers")
@@ -41,10 +32,15 @@ public class Worker {
     private String name;          // e.g. "worker-high-1"
 
     @Enumerated(EnumType.STRING)
-    private QueueType queueType;  // HIGH, DEFAULT, DLQ (note: not "SCHEDULED" as priority — separate concept)
+    private QueueType queueType;  // HIGH_PRIORITY, DEFAULT_PRIORITY, DEAD_LETTER_QUEUE
 
     @Enumerated(EnumType.STRING)
     private WorkerStatus status;  // ONLINE, OFFLINE, UNHEALTHY
     private Instant lastHeartbeat;
     private Instant startedAt;
+
+    private String hostname;
+    private int pid;
+    private int capacity;         // max concurrent tasks this worker's thread pool can run
+    private String version;       // worker build/version string
 }

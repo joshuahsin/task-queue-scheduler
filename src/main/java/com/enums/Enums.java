@@ -64,4 +64,10 @@ public class Enums {
         ACTIVE,
         INACTIVE
     }
+
+    public enum WorkerStatus {
+        ONLINE,
+        OFFLINE,
+        UNHEALTHY
+    }
 }
