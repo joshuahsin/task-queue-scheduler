@@ -59,4 +59,9 @@ public class Enums {
         DEFAULT_PRIORITY,
         DEAD_LETTER_QUEUE
     }
+
+    public enum TenantStatus {
+        ACTIVE,
+        INACTIVE
+    }
 }

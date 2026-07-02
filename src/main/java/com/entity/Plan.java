@@ -3,6 +3,9 @@ package com.entity;
 import java.util.UUID;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -18,6 +21,8 @@ import com.enums.Enums.Tier;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Plan {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     private Tier tier;
     private int rateLimit;

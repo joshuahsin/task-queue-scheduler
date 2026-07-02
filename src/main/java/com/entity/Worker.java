@@ -38,7 +38,6 @@ public class Worker {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
     private String name;          // e.g. "worker-high-1"
 
     @Enumerated(EnumType.STRING)
@@ -46,7 +45,6 @@ public class Worker {
 
     @Enumerated(EnumType.STRING)
     private WorkerStatus status;  // ONLINE, OFFLINE, UNHEALTHY
-
     private Instant lastHeartbeat;
     private Instant startedAt;
 }

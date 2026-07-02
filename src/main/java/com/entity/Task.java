@@ -13,6 +13,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -30,6 +31,7 @@ import com.enums.Enums.TaskStatus;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Task {
+    @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     
@@ -50,7 +52,6 @@ public class Task {
     private Map<String, Object> payload;
 
     private String payloadRef;
-
     private Instant scheduledAt;
     private int retryCount;
     private Instant createdAt;
