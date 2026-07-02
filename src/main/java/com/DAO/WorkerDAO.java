@@ -8,7 +8,7 @@ import com.entity.Worker;
 import com.enums.Enums.QueueType;
 
 public interface WorkerDAO {
-    public Worker registerWorker(String name, QueueType queueType);
+    public Worker registerWorker(String name, QueueType queueType, String hostname, int pid, int capacity, String version);
     public boolean heartbeatWorker(String workerId);
     public List<Worker> getWorkers();
     public List<Worker> getWorkersByType(QueueType queueType);
