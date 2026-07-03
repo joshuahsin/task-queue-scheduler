@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import com.DAO.APIKeyDAO;
 import com.entity.APIKey;
 import com.enums.Enums.ApiKeyStatus;
+import com.exception.InvalidApiKeyException;
 import com.repo.APIKeyRepo;
 import com.security.JwtUtil;
 
@@ -49,13 +51,13 @@ public class APIKeyService implements APIKeyDAO {
     @Override
     public String getToken(String apiKey) {
         APIKey record = apiKeyRepo.findByKeyHash(hash(apiKey))
-                .orElseThrow(() -> new IllegalArgumentException("Invalid API key"));
+                .orElseThrow(() -> new InvalidApiKeyException("Invalid API key"));
 
         if (record.getStatus() != ApiKeyStatus.ACTIVE) {
-            throw new IllegalArgumentException("API key is inactive");
+            throw new InvalidApiKeyException("API key is inactive");
         }
         if (record.getExpiresAt() != null && record.getExpiresAt().isBefore(Instant.now())) {
-            throw new IllegalArgumentException("API key has expired");
+            throw new InvalidApiKeyException("API key has expired");
         }
 
         return jwtUtil.generateToken(record.getTenantId());
@@ -75,5 +77,23 @@ public class APIKeyService implements APIKeyDAO {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    @Override
+    public boolean revokeAPIKey(UUID apiKeyId) {
+        return apiKeyRepo.findById(apiKeyId)
+                .map(apiKey -> {
+                    apiKey.setStatus(ApiKeyStatus.INACTIVE);
+                    apiKeyRepo.save(apiKey);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Override
+    public List<APIKey> getAPIKeys(UUID tenantId, ApiKeyStatus status) {
+        return status == null
+                ? apiKeyRepo.findByTenantId(tenantId)
+                : apiKeyRepo.findByTenantIdAndStatus(tenantId, status);
     }
 }

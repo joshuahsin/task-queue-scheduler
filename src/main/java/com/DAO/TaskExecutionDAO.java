@@ -7,5 +7,5 @@ import com.entity.TaskExecution;
 
 public interface TaskExecutionDAO {
     public List<TaskExecution> getTaskExecutions(UUID taskId);
-    public boolean CancelTaskExecution(UUID taskId);
+    public boolean cancelTaskExecution(UUID taskId);
 }
