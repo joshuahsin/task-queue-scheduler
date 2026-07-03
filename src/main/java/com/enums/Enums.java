@@ -7,11 +7,6 @@ public class Enums {
         INACTIVE
     }
 
-    public enum Tier {
-        FREE,
-        PREMIUM
-    }
-    
     public enum PriorityType {
         HIGH_PRIORITY,
         DEFAULT_PRIORITY
@@ -23,7 +18,6 @@ public class Enums {
     }
 
     public enum TaskStatus {
-        SCHEDULED,   // scheduled_at is in the future, sitting in Redis sorted set
         QUEUED,      // on the broker (SQS/Redis Stream), ready for a worker to claim
         RUNNING,     // a worker has claimed it and is actively executing
         SUCCESS,     // terminal — completed without error
@@ -36,7 +30,8 @@ public class Enums {
     public enum TaskExecutionStatus {
         RUNNING,
         SUCCESS,
-        FAILED
+        FAILED,
+        CANCELLED
     }
 
     public enum ErrorType {

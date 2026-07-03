@@ -3,10 +3,7 @@ package com.entity;
 import java.time.Instant;
 import java.util.UUID;
 
-import jakarta.annotation.Generated;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -22,8 +19,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class TenantMetrics {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    UUID tenantId;
+    UUID tenantId; // same value as the owning Tenant's id — this is a keyed snapshot, not an independent row
 
     // task counts
     long totalTasks;

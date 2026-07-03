@@ -12,7 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import com.enums.Enums.Tier;
+import com.enums.Enums.PlanTier;
 
 @Entity
 @Table(name = "plans")
@@ -24,7 +24,7 @@ public class Plan {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    private Tier tier;
+    private PlanTier tier;
     private int rateLimit;
     private int maxRetries;
     private int payloadSizeLimit;
