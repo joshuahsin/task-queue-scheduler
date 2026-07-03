@@ -30,8 +30,9 @@ public class TaskService implements TaskDAO{
     }
 
     @Override
-    public UUID queueTask(TaskType type, PriorityType priority, Instant scheduledAt) {
+    public UUID queueTask(UUID tenantId, TaskType type, PriorityType priority, Instant scheduledAt) {
         Task task = new Task();
+        task.setTenantId(tenantId);
         task.setTaskType(type);
         task.setPriority(priority);
         task.setScheduledAt(scheduledAt);
@@ -41,8 +42,9 @@ public class TaskService implements TaskDAO{
     }
 
     @Override
-    public boolean cancelTask(UUID taskId) {
+    public boolean cancelTask(UUID taskId, UUID tenantId) {
         return taskRepo.findById(taskId)
+            .filter(task -> task.getTenantId().equals(tenantId))
             .map(task -> {
                 task.setTaskStatus(TaskStatus.CANCELLED);
                 taskRepo.save(task);
@@ -52,8 +54,9 @@ public class TaskService implements TaskDAO{
     }
 
     @Override
-    public Optional<Task> getTask(UUID taskId) {
-        return taskRepo.findById(taskId);
+    public Optional<Task> getTask(UUID taskId, UUID tenantId) {
+        return taskRepo.findById(taskId)
+            .filter(task -> task.getTenantId().equals(tenantId));
     }
 
     @Override

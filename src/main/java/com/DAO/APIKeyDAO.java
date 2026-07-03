@@ -10,6 +10,6 @@ import com.enums.Enums.ApiKeyStatus;
 public interface APIKeyDAO {
     public String getToken(String apiKey);
     public String createAPIKey(UUID tenantID, String name, Instant expiresAt);
-    public boolean revokeAPIKey(UUID apiKeyId);
+    public boolean revokeAPIKey(UUID apiKeyId, UUID tenantId);
     public List<APIKey> getAPIKeys(UUID tenantId, ApiKeyStatus status);
 }

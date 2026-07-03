@@ -51,8 +51,9 @@ public class UserService implements UserDAO {
     }
 
     @Override
-    public boolean deleteAccount(UUID userId) {
+    public boolean deleteAccount(UUID userId, UUID tenantId) {
         return userRepo.findById(userId)
+                .filter(user -> user.getTenantId().equals(tenantId))
                 .map(user -> {
                     userRepo.delete(user);
                     return true;

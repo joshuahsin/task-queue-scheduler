@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +27,7 @@ import com.DTO.RegisterRequest;
 import com.enums.Enums.ApiKeyStatus;
 import com.exception.APIKeyNotFoundException;
 import com.exception.UserNotFoundException;
+import com.security.AuthenticatedPrincipal;
 import com.service.APIKeyService;
 import com.service.UserService;
 
@@ -53,8 +55,9 @@ public class UserController {
     }
 
     @DeleteMapping("/account")
-    public ResponseEntity<Void> deleteAccount(@RequestParam UUID userId) {
-        if (!userService.deleteAccount(userId)) {
+    public ResponseEntity<Void> deleteAccount(@AuthenticationPrincipal AuthenticatedPrincipal principal,
+            @RequestParam UUID userId) {
+        if (!userService.deleteAccount(userId, principal.tenantId())) {
             throw new UserNotFoundException(userId);
         }
         return ResponseEntity.noContent().build();
@@ -67,14 +70,16 @@ public class UserController {
     }
 
     @PostMapping("/api-keys")
-    public ResponseEntity<CreateAPIKeyResponse> createAPIKey(@Valid @RequestBody CreateAPIKeyRequest request) {
-        String key = apiKeyService.createAPIKey(request.getTenantId(), request.getName(), request.getExpiresAt());
+    public ResponseEntity<CreateAPIKeyResponse> createAPIKey(@AuthenticationPrincipal AuthenticatedPrincipal principal,
+            @Valid @RequestBody CreateAPIKeyRequest request) {
+        String key = apiKeyService.createAPIKey(principal.tenantId(), request.getName(), request.getExpiresAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(new CreateAPIKeyResponse(key));
     }
 
     @DeleteMapping("/api-keys/{apiKeyId}")
-    public ResponseEntity<Void> revokeAPIKey(@PathVariable UUID apiKeyId) {
-        if (!apiKeyService.revokeAPIKey(apiKeyId)) {
+    public ResponseEntity<Void> revokeAPIKey(@AuthenticationPrincipal AuthenticatedPrincipal principal,
+            @PathVariable UUID apiKeyId) {
+        if (!apiKeyService.revokeAPIKey(apiKeyId, principal.tenantId())) {
             throw new APIKeyNotFoundException(apiKeyId);
         }
         return ResponseEntity.noContent().build();
@@ -82,9 +87,9 @@ public class UserController {
 
     @GetMapping("/api-keys")
     public ResponseEntity<List<APIKeyResponse>> getAPIKeys(
-            @RequestParam UUID tenantId,
+            @AuthenticationPrincipal AuthenticatedPrincipal principal,
             @RequestParam(required = false) ApiKeyStatus status) {
-        List<APIKeyResponse> keys = apiKeyService.getAPIKeys(tenantId, status).stream()
+        List<APIKeyResponse> keys = apiKeyService.getAPIKeys(principal.tenantId(), status).stream()
             .map(APIKeyResponse::from)
             .toList();
         return ResponseEntity.ok(keys);

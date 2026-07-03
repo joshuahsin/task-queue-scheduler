@@ -80,8 +80,9 @@ public class APIKeyService implements APIKeyDAO {
     }
 
     @Override
-    public boolean revokeAPIKey(UUID apiKeyId) {
+    public boolean revokeAPIKey(UUID apiKeyId, UUID tenantId) {
         return apiKeyRepo.findById(apiKeyId)
+                .filter(apiKey -> apiKey.getTenantId().equals(tenantId))
                 .map(apiKey -> {
                     apiKey.setStatus(ApiKeyStatus.INACTIVE);
                     apiKeyRepo.save(apiKey);

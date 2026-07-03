@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import com.enums.Enums.PlanTier;
 import com.exception.PlanNotFoundException;
 import com.exception.TenantMetricsNotFoundException;
 import com.exception.TenantNotFoundException;
+import com.security.AuthenticatedPrincipal;
 import com.service.PlanService;
 import com.service.TenantService;
 
@@ -64,7 +66,9 @@ public class TenantController {
     }
 
     @DeleteMapping("/{tenantId}")
-    public ResponseEntity<Void> deleteTenant(@PathVariable UUID tenantId) {
+    public ResponseEntity<Void> deleteTenant(@AuthenticationPrincipal AuthenticatedPrincipal principal,
+            @PathVariable UUID tenantId) {
+        requireOwnTenant(principal, tenantId);
         if (!tenantService.deleteTenant(tenantId)) {
             throw new TenantNotFoundException(tenantId);
         }
@@ -73,8 +77,10 @@ public class TenantController {
 
     @PutMapping("/{tenantId}")
     public ResponseEntity<TenantResponse> updateTenant(
+            @AuthenticationPrincipal AuthenticatedPrincipal principal,
             @PathVariable UUID tenantId,
             @Valid @RequestBody UpdateTenantRequest request) {
+        requireOwnTenant(principal, tenantId);
         TenantResponse response = tenantService.updateTenant(tenantId, request.getPlanId())
             .map(TenantResponse::from)
             .orElseThrow(() -> new TenantNotFoundException(tenantId));
@@ -82,7 +88,9 @@ public class TenantController {
     }
 
     @GetMapping("/{tenantId}")
-    public ResponseEntity<TenantResponse> getTenant(@PathVariable UUID tenantId) {
+    public ResponseEntity<TenantResponse> getTenant(@AuthenticationPrincipal AuthenticatedPrincipal principal,
+            @PathVariable UUID tenantId) {
+        requireOwnTenant(principal, tenantId);
         TenantResponse response = tenantService.getTenant(tenantId)
             .map(TenantResponse::from)
             .orElseThrow(() -> new TenantNotFoundException(tenantId));
@@ -90,10 +98,20 @@ public class TenantController {
     }
 
     @GetMapping("/{tenantId}/metrics")
-    public ResponseEntity<TenantMetricsResponse> getTenantMetrics(@PathVariable UUID tenantId) {
+    public ResponseEntity<TenantMetricsResponse> getTenantMetrics(@AuthenticationPrincipal AuthenticatedPrincipal principal,
+            @PathVariable UUID tenantId) {
+        requireOwnTenant(principal, tenantId);
         TenantMetricsResponse response = tenantService.getTenantMetrics(tenantId)
             .map(TenantMetricsResponse::from)
             .orElseThrow(() -> new TenantMetricsNotFoundException(tenantId));
         return ResponseEntity.ok(response);
+    }
+
+    // A mismatch is treated identically to "doesn't exist" — a caller shouldn't be able to
+    // learn that a tenant they don't belong to exists just by probing IDs.
+    private void requireOwnTenant(AuthenticatedPrincipal principal, UUID tenantId) {
+        if (!principal.tenantId().equals(tenantId)) {
+            throw new TenantNotFoundException(tenantId);
+        }
     }
 }
