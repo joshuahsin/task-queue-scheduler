@@ -1,5 +1,6 @@
 package com.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
@@ -7,24 +8,36 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.DTO.APIKeyResponse;
+import com.DTO.ApiKeyTokenRequest;
 import com.DTO.AuthResponse;
+import com.DTO.CreateAPIKeyRequest;
+import com.DTO.CreateAPIKeyResponse;
 import com.DTO.LoginRequest;
 import com.DTO.RegisterRequest;
+import com.enums.Enums.ApiKeyStatus;
+import com.exception.APIKeyNotFoundException;
+import com.exception.UserNotFoundException;
+import com.service.APIKeyService;
 import com.service.UserService;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 public class UserController {
     private final UserService userService;
+    private final APIKeyService apiKeyService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, APIKeyService apiKeyService) {
         this.userService = userService;
+        this.apiKeyService = apiKeyService;
     }
 
     @PostMapping("/register")
@@ -41,7 +54,9 @@ public class UserController {
 
     @DeleteMapping("/account")
     public ResponseEntity<Void> deleteAccount(@RequestParam UUID userId) {
-        userService.deleteAccount(userId);
+        if (!userService.deleteAccount(userId)) {
+            throw new UserNotFoundException(userId);
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -49,5 +64,35 @@ public class UserController {
     public ResponseEntity<AuthResponse> refreshToken(@RequestParam String refreshToken) {
         String newToken = userService.refreshToken(refreshToken);
         return ResponseEntity.ok(new AuthResponse(newToken, "Bearer"));
+    }
+
+    @PostMapping("/api-keys")
+    public ResponseEntity<CreateAPIKeyResponse> createAPIKey(@Valid @RequestBody CreateAPIKeyRequest request) {
+        String key = apiKeyService.createAPIKey(request.getTenantId(), request.getName(), request.getExpiresAt());
+        return ResponseEntity.status(HttpStatus.CREATED).body(new CreateAPIKeyResponse(key));
+    }
+
+    @DeleteMapping("/api-keys/{apiKeyId}")
+    public ResponseEntity<Void> revokeAPIKey(@PathVariable UUID apiKeyId) {
+        if (!apiKeyService.revokeAPIKey(apiKeyId)) {
+            throw new APIKeyNotFoundException(apiKeyId);
+        }
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api-keys")
+    public ResponseEntity<List<APIKeyResponse>> getAPIKeys(
+            @RequestParam UUID tenantId,
+            @RequestParam(required = false) ApiKeyStatus status) {
+        List<APIKeyResponse> keys = apiKeyService.getAPIKeys(tenantId, status).stream()
+            .map(APIKeyResponse::from)
+            .toList();
+        return ResponseEntity.ok(keys);
+    }
+
+    @PostMapping("/api-keys/token")
+    public ResponseEntity<AuthResponse> getApiKeyToken(@Valid @RequestBody ApiKeyTokenRequest request) {
+        String token = apiKeyService.getToken(request.getApiKey());
+        return ResponseEntity.ok(new AuthResponse(token, "Bearer"));
     }
 }

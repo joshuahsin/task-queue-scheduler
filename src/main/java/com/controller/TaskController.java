@@ -22,6 +22,8 @@ import com.DTO.TaskExecutionResponse;
 import com.DTO.TaskResponse;
 import com.enums.Enums.PriorityType;
 import com.enums.Enums.TaskStatus;
+import com.exception.TaskExecutionNotFoundException;
+import com.exception.TaskNotFoundException;
 import com.service.TaskExecutionService;
 import com.service.TaskService;
 
@@ -44,12 +46,17 @@ public class TaskController {
 
     @GetMapping("/{taskId}")
     public ResponseEntity<TaskResponse> getTask(@PathVariable UUID taskId) {
-        return ResponseEntity.ok(TaskResponse.from(taskService.getTask(taskId)));
+        TaskResponse response = taskService.getTask(taskId)
+            .map(TaskResponse::from)
+            .orElseThrow(() -> new TaskNotFoundException(taskId));
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{taskId}")
     public ResponseEntity<Void> cancelTask(@PathVariable UUID taskId) {
-        taskService.cancelTask(taskId);
+        if (!taskService.cancelTask(taskId)) {
+            throw new TaskNotFoundException(taskId);
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -58,11 +65,10 @@ public class TaskController {
             @RequestParam UUID tenantId,
             @RequestParam(required = false) PriorityType priority,
             @RequestParam(required = false) TaskStatus status,
-            @RequestParam(defaultValue = "-1") int retryCount,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Page<TaskResponse> results = taskService
-            .getTasksQuery(tenantId, priority, status, retryCount, page, size)
+            .getTasksQuery(tenantId, priority != null ? priority.ordinal() : -1, status, page, size)
             .map(TaskResponse::from);
         return ResponseEntity.ok(results);
     }
@@ -78,7 +84,9 @@ public class TaskController {
 
     @DeleteMapping("/{taskId}/executions")
     public ResponseEntity<Void> cancelTaskExecution(@PathVariable UUID taskId) {
-        taskExecutionService.cancelTaskExecution(taskId);
+        if (!taskExecutionService.cancelTaskExecution(taskId)) {
+            throw new TaskExecutionNotFoundException(taskId);
+        }
         return ResponseEntity.noContent().build();
     }
 }
