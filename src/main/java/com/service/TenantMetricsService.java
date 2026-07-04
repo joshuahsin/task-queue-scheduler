@@ -44,6 +44,7 @@ public class TenantMetricsService {
         tenantRepo.findAll().forEach(this::refreshTenantMetrics);
     }
 
+    @SuppressWarnings("null")
     public TenantMetrics refreshTenantMetrics(Tenant tenant) {
         UUID tenantId = tenant.getId();
         List<Task> tasks = taskRepo.findByTenantId(tenantId);

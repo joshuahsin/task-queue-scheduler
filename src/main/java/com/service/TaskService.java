@@ -14,19 +14,29 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import com.oracle.bmc.queue.QueueClient;
+import com.oracle.bmc.queue.model.MessageMetadata;
+import com.oracle.bmc.queue.model.PutMessagesDetails;
+import com.oracle.bmc.queue.model.PutMessagesDetailsEntry;
+import com.oracle.bmc.queue.requests.PutMessagesRequest;
+
 import com.DAO.TaskDAO;
 import com.entity.Task;
 import com.enums.Enums.PriorityType;
+import com.enums.Enums.QueueType;
 import com.enums.Enums.TaskStatus;
 import com.enums.Enums.TaskType;
+import com.oci.QueueConnectionManager;
 import com.repo.TaskRepo;
 
 @Service
 public class TaskService implements TaskDAO{
     private final TaskRepo taskRepo;
+    private final QueueConnectionManager queueConnectionManager;
 
-    public TaskService(TaskRepo taskRepo) {
+    public TaskService(TaskRepo taskRepo, QueueConnectionManager queueConnectionManager) {
         this.taskRepo = taskRepo;
+        this.queueConnectionManager = queueConnectionManager;
     }
 
     @Override
@@ -38,7 +48,36 @@ public class TaskService implements TaskDAO{
         task.setScheduledAt(scheduledAt);
         task.setTaskStatus(TaskStatus.QUEUED);
         task.setCreatedAt(Instant.now());
-        return taskRepo.save(task).getId();
+        UUID taskId = taskRepo.save(task).getId();
+
+        publishToQueue(tenantId, priority, taskId);
+
+        return taskId;
+    }
+
+    // Tenant is tagged as the message's channel — see the earlier design discussion on using
+    // OCI Queue's channel/max-channel-consumption fairness feature to stop one busy tenant from
+    // starving others on a shared queue.
+    private void publishToQueue(UUID tenantId, PriorityType priority, UUID taskId) {
+        QueueType queueType = priority == PriorityType.HIGH_PRIORITY ? QueueType.HIGH_PRIORITY : QueueType.DEFAULT_PRIORITY;
+        QueueClient client = queueConnectionManager.getClient(queueType);
+        String queueId = queueConnectionManager.getQueueId(queueType);
+
+        PutMessagesDetailsEntry entry = PutMessagesDetailsEntry.builder()
+                .content(taskId.toString())
+                .metadata(MessageMetadata.builder()
+                        .channelId(tenantId.toString())
+                        .build())
+                .build();
+
+        PutMessagesRequest request = PutMessagesRequest.builder()
+                .queueId(queueId)
+                .putMessagesDetails(PutMessagesDetails.builder()
+                        .messages(List.of(entry))
+                        .build())
+                .build();
+
+        client.putMessages(request);
     }
 
     @Override

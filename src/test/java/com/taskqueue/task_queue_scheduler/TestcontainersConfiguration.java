@@ -16,6 +16,7 @@ class TestcontainersConfiguration {
 		return new PostgreSQLContainer(DockerImageName.parse("postgres:latest"));
 	}
 
+	@SuppressWarnings("resource")
 	@Bean
 	@ServiceConnection(name = "redis")
 	GenericContainer<?> redisContainer() {

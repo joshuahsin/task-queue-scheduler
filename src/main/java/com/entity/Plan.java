@@ -3,6 +3,8 @@ package com.entity;
 import java.util.UUID;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -24,6 +26,8 @@ public class Plan {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Enumerated(EnumType.STRING)
     private PlanTier tier;
     private int rateLimit;
     private int maxRetries;

@@ -65,6 +65,7 @@ public class WorkerService implements WorkerDAO {
     }
 
     @Override
+    @SuppressWarnings("null")
     public List<TaskExecution> getTaskExecutionsByWorkerType(QueueType queueType) {
         List<UUID> workerIds = workerRepo.findByQueueType(queueType).stream()
             .map(Worker::getId)
