@@ -15,20 +15,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.DTO.ClaimTaskResponse;
+import com.DTO.CompleteExecutionRequest;
 import com.DTO.RegisterWorkerRequest;
 import com.DTO.TaskExecutionResponse;
 import com.DTO.WorkerResponse;
 import com.enums.Enums.QueueType;
 import com.exception.WorkerNotFoundException;
 import com.service.WorkerService;
+import com.service.WorkerTaskService;
 
 @RestController
 @RequestMapping("/api/v1/workers")
 public class WorkerController {
     private final WorkerService workerService;
+    private final WorkerTaskService workerTaskService;
 
-    public WorkerController(WorkerService workerService) {
+    public WorkerController(WorkerService workerService, WorkerTaskService workerTaskService) {
         this.workerService = workerService;
+        this.workerTaskService = workerTaskService;
     }
 
     @PostMapping
@@ -63,5 +68,18 @@ public class WorkerController {
             .map(TaskExecutionResponse::from)
             .toList();
         return ResponseEntity.ok(executions);
+    }
+
+    @PostMapping("/{workerId}/tasks/{taskId}/claim")
+    public ResponseEntity<ClaimTaskResponse> claimTask(@PathVariable UUID workerId, @PathVariable UUID taskId) {
+        return ResponseEntity.ok(workerTaskService.claimTask(workerId, taskId));
+    }
+
+    @PostMapping("/{workerId}/tasks/{taskId}/executions/{executionId}/complete")
+    public ResponseEntity<Void> completeExecution(@PathVariable UUID workerId, @PathVariable UUID taskId,
+            @PathVariable UUID executionId, @Valid @RequestBody CompleteExecutionRequest request) {
+        workerTaskService.completeExecution(workerId, taskId, executionId, request.getSuccess(),
+            request.getErrorType(), request.getErrorMessage());
+        return ResponseEntity.noContent().build();
     }
 }

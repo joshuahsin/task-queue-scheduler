@@ -36,7 +36,6 @@ public class APIKeyService implements APIKeyDAO {
         String rawKey = generateRawKey();
 
         APIKey apiKey = new APIKey();
-        apiKey.setId(UUID.randomUUID());
         apiKey.setTenantId(tenantId);
         apiKey.setName(name);
         apiKey.setKeyHash(hash(rawKey));

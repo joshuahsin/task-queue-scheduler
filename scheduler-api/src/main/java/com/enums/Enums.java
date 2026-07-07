@@ -65,4 +65,9 @@ public class Enums {
         OFFLINE,
         UNHEALTHY
     }
+
+    public enum ClaimOutcome {
+        CLAIMED,
+        SKIPPED
+    }
 }
