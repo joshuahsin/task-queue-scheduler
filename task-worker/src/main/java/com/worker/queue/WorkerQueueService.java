@@ -41,6 +41,13 @@ public class WorkerQueueService {
         this.queueId = queueOcid;
     }
 
+    // Package-private: lets tests inject a mock QueueClient directly, bypassing the real OCI admin
+    // lookup the public constructor performs (which needs live OCI credentials/network access).
+    WorkerQueueService(QueueClient queueClient, String queueId) {
+        this.queueClient = queueClient;
+        this.queueId = queueId;
+    }
+
     public List<GetMessage> getMessages(int limit, int visibilityTimeoutSeconds, int longPollTimeoutSeconds) {
         return queueClient.getMessages(GetMessagesRequest.builder()
                         .queueId(queueId)
