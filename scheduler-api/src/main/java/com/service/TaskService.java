@@ -21,26 +21,43 @@ import com.oracle.bmc.queue.model.PutMessagesDetailsEntry;
 import com.oracle.bmc.queue.requests.PutMessagesRequest;
 
 import com.DAO.TaskDAO;
+import com.entity.Plan;
 import com.entity.Task;
 import com.enums.Enums.PriorityType;
 import com.enums.Enums.QueueType;
 import com.enums.Enums.TaskStatus;
 import com.enums.Enums.TaskType;
+import com.exception.RateLimitExceededException;
 import com.oci.QueueConnectionManager;
+import com.repo.PlanRepo;
 import com.repo.TaskRepo;
+import com.repo.TenantMetricsRepo;
+import com.repo.TenantRepo;
 
 @Service
 public class TaskService implements TaskDAO{
     private final TaskRepo taskRepo;
     private final QueueConnectionManager queueConnectionManager;
+    private final TenantRepo tenantRepo;
+    private final PlanRepo planRepo;
+    private final RateLimiterService rateLimiterService;
+    private final TenantMetricsRepo tenantMetricsRepo;
 
-    public TaskService(TaskRepo taskRepo, QueueConnectionManager queueConnectionManager) {
+    public TaskService(TaskRepo taskRepo, QueueConnectionManager queueConnectionManager,
+            TenantRepo tenantRepo, PlanRepo planRepo, RateLimiterService rateLimiterService,
+            TenantMetricsRepo tenantMetricsRepo) {
         this.taskRepo = taskRepo;
         this.queueConnectionManager = queueConnectionManager;
+        this.tenantRepo = tenantRepo;
+        this.planRepo = planRepo;
+        this.rateLimiterService = rateLimiterService;
+        this.tenantMetricsRepo = tenantMetricsRepo;
     }
 
     @Override
     public UUID queueTask(UUID tenantId, TaskType type, PriorityType priority, Instant scheduledAt) {
+        enforceRateLimit(tenantId);
+
         Task task = new Task();
         task.setTenantId(tenantId);
         task.setTaskType(type);
@@ -53,6 +70,21 @@ public class TaskService implements TaskDAO{
         publishToQueue(tenantId, priority, taskId);
 
         return taskId;
+    }
+
+    private void enforceRateLimit(UUID tenantId) {
+        Optional<Integer> rateLimit = tenantRepo.findById(tenantId)
+                .flatMap(tenant -> planRepo.findById(tenant.getPlanId()))
+                .map(Plan::getRateLimit);
+
+        if (rateLimit.isEmpty()) {
+            return; // unresolvable tenant/plan — let downstream (e.g. the tasks.tenant_id FK) handle it
+        }
+
+        if (!rateLimiterService.tryAcquire(tenantId, rateLimit.get())) {
+            tenantMetricsRepo.incrementRateLimitHits(tenantId);
+            throw new RateLimitExceededException(tenantId);
+        }
     }
 
     // Tenant is tagged as the message's channel — see the earlier design discussion on using

@@ -20,16 +20,24 @@ import com.oracle.bmc.queue.QueueClient;
 import com.oracle.bmc.queue.model.PutMessagesDetailsEntry;
 import com.oracle.bmc.queue.requests.PutMessagesRequest;
 
+import com.entity.Plan;
 import com.entity.Task;
+import com.entity.Tenant;
 import com.enums.Enums.PriorityType;
 import com.enums.Enums.QueueType;
 import com.enums.Enums.TaskStatus;
 import com.enums.Enums.TaskType;
+import com.exception.RateLimitExceededException;
 import com.oci.QueueConnectionManager;
+import com.repo.PlanRepo;
 import com.repo.TaskRepo;
+import com.repo.TenantMetricsRepo;
+import com.repo.TenantRepo;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,12 +50,21 @@ class TaskServiceTest {
     private QueueConnectionManager queueConnectionManager;
     @Mock
     private QueueClient queueClient;
+    @Mock
+    private TenantRepo tenantRepo;
+    @Mock
+    private PlanRepo planRepo;
+    @Mock
+    private RateLimiterService rateLimiterService;
+    @Mock
+    private TenantMetricsRepo tenantMetricsRepo;
 
     private TaskService taskService;
 
     @BeforeEach
     void setUp() {
-        taskService = new TaskService(taskRepo, queueConnectionManager);
+        taskService = new TaskService(taskRepo, queueConnectionManager, tenantRepo, planRepo,
+                rateLimiterService, tenantMetricsRepo);
     }
 
     @Test
@@ -191,5 +208,72 @@ class TaskServiceTest {
 
         // no exception thrown building/using the specification with priority=-1 and status=null
         verify(taskRepo).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    void queueTask_throwsRateLimitExceededAndIncrementsMetricWhenOverLimit() {
+        UUID tenantId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        Tenant tenant = new Tenant();
+        tenant.setPlanId(planId);
+        Plan plan = new Plan();
+        plan.setRateLimit(60);
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(planRepo.findById(planId)).thenReturn(Optional.of(plan));
+        when(rateLimiterService.tryAcquire(tenantId, 60)).thenReturn(false);
+
+        assertThatThrownBy(() -> taskService.queueTask(tenantId, TaskType.SIMULATED_WORK, PriorityType.HIGH_PRIORITY, null))
+                .isInstanceOf(RateLimitExceededException.class);
+
+        verify(tenantMetricsRepo).incrementRateLimitHits(tenantId);
+        verify(taskRepo, never()).save(any());
+        verify(queueConnectionManager, never()).getClient(any());
+    }
+
+    @Test
+    void queueTask_proceedsWhenUnderLimit() {
+        UUID tenantId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        Tenant tenant = new Tenant();
+        tenant.setPlanId(planId);
+        Plan plan = new Plan();
+        plan.setRateLimit(60);
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(planRepo.findById(planId)).thenReturn(Optional.of(plan));
+        when(rateLimiterService.tryAcquire(tenantId, 60)).thenReturn(true);
+        when(taskRepo.save(any(Task.class))).thenAnswer(invocation -> {
+            Task task = invocation.getArgument(0);
+            task.setId(taskId);
+            return task;
+        });
+        when(queueConnectionManager.getClient(QueueType.HIGH_PRIORITY)).thenReturn(queueClient);
+        when(queueConnectionManager.getQueueId(QueueType.HIGH_PRIORITY)).thenReturn("queue-ocid");
+
+        UUID result = taskService.queueTask(tenantId, TaskType.SIMULATED_WORK, PriorityType.HIGH_PRIORITY, null);
+
+        assertThat(result).isEqualTo(taskId);
+        verify(rateLimiterService).tryAcquire(tenantId, 60);
+        verify(tenantMetricsRepo, never()).incrementRateLimitHits(any());
+    }
+
+    @Test
+    void queueTask_skipsRateLimitWhenTenantNotFound() {
+        UUID tenantId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.empty());
+        when(taskRepo.save(any(Task.class))).thenAnswer(invocation -> {
+            Task task = invocation.getArgument(0);
+            task.setId(taskId);
+            return task;
+        });
+        when(queueConnectionManager.getClient(QueueType.HIGH_PRIORITY)).thenReturn(queueClient);
+        when(queueConnectionManager.getQueueId(QueueType.HIGH_PRIORITY)).thenReturn("queue-ocid");
+
+        UUID result = taskService.queueTask(tenantId, TaskType.SIMULATED_WORK, PriorityType.HIGH_PRIORITY, null);
+
+        assertThat(result).isEqualTo(taskId);
+        verify(rateLimiterService, never()).tryAcquire(any(), any(Integer.class));
+        verify(tenantMetricsRepo, never()).incrementRateLimitHits(any());
     }
 }
