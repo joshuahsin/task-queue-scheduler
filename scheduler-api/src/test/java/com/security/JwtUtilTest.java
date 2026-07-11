@@ -82,7 +82,18 @@ class JwtUtilTest {
     @Test
     void parseClaims_throwsInvalidTokenExceptionWhenTokenIsTampered() {
         String token = jwtUtil.generateToken(UUID.randomUUID());
-        String tampered = token.substring(0, token.length() - 1) + (token.endsWith("A") ? "B" : "A");
+        // Flip a character in the middle of the payload segment, not the token's last character.
+        // Base64's final character in a run can have unused padding bits, so swapping it for a
+        // fixed alternate character isn't guaranteed to change the decoded bytes — flakily passing
+        // or failing depending on which character the random UUID happened to produce there. An
+        // interior character always decodes all 6 of its bits meaningfully, so flipping it reliably
+        // changes the payload's actual bytes, which reliably invalidates the signature.
+        String[] parts = token.split("\\.");
+        String payload = parts[1];
+        int middle = payload.length() / 2;
+        char flipped = payload.charAt(middle) == 'A' ? 'B' : 'A';
+        String tamperedPayload = payload.substring(0, middle) + flipped + payload.substring(middle + 1);
+        String tampered = parts[0] + "." + tamperedPayload + "." + parts[2];
 
         assertThatThrownBy(() -> jwtUtil.parseClaims(tampered))
                 .isInstanceOf(InvalidTokenException.class);
