@@ -25,12 +25,16 @@ public class TaskExecutionService implements TaskExecutionDAO {
 
     @Override
     public boolean cancelTaskExecution(UUID taskId) {
-        return taskExecutionRepo.findById(taskId)
-            .map(execution -> {
-                execution.setStatus(TaskExecutionStatus.CANCELLED);
-                taskExecutionRepo.save(execution);
-                return true;
-            })
-            .orElse(false);
+        List<TaskExecution> runningExecutions = taskExecutionRepo.findByTaskId(taskId).stream()
+            .filter(execution -> execution.getStatus() == TaskExecutionStatus.RUNNING)
+            .toList();
+
+        if (runningExecutions.isEmpty()) {
+            return false;
+        }
+
+        runningExecutions.forEach(execution -> execution.setStatus(TaskExecutionStatus.CANCELLED));
+        taskExecutionRepo.saveAll(runningExecutions);
+        return true;
     }
 }

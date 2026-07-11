@@ -1,7 +1,6 @@
 package com.service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -45,28 +44,45 @@ class TaskExecutionServiceTest {
     }
 
     @Test
-    void cancelTaskExecution_setsCancelledStatusWhenFound() {
-        UUID executionId = UUID.randomUUID();
-        TaskExecution execution = new TaskExecution();
-        execution.setId(executionId);
-        execution.setStatus(TaskExecutionStatus.RUNNING);
-        when(taskExecutionRepo.findById(executionId)).thenReturn(Optional.of(execution));
+    void cancelTaskExecution_cancelsOnlyTheRunningExecutionsForThatTask() {
+        UUID taskId = UUID.randomUUID();
+        TaskExecution running = new TaskExecution();
+        running.setTaskId(taskId);
+        running.setStatus(TaskExecutionStatus.RUNNING);
+        TaskExecution alreadySucceeded = new TaskExecution();
+        alreadySucceeded.setTaskId(taskId);
+        alreadySucceeded.setStatus(TaskExecutionStatus.SUCCESS);
+        when(taskExecutionRepo.findByTaskId(taskId)).thenReturn(List.of(running, alreadySucceeded));
 
-        boolean result = taskExecutionService.cancelTaskExecution(executionId);
+        boolean result = taskExecutionService.cancelTaskExecution(taskId);
 
         assertThat(result).isTrue();
-        assertThat(execution.getStatus()).isEqualTo(TaskExecutionStatus.CANCELLED);
-        verify(taskExecutionRepo).save(execution);
+        assertThat(running.getStatus()).isEqualTo(TaskExecutionStatus.CANCELLED);
+        assertThat(alreadySucceeded.getStatus()).isEqualTo(TaskExecutionStatus.SUCCESS);
+        verify(taskExecutionRepo).saveAll(List.of(running));
     }
 
     @Test
-    void cancelTaskExecution_returnsFalseWhenNotFound() {
-        UUID executionId = UUID.randomUUID();
-        when(taskExecutionRepo.findById(executionId)).thenReturn(Optional.empty());
+    void cancelTaskExecution_returnsFalseWhenNoExecutionIsRunning() {
+        UUID taskId = UUID.randomUUID();
+        TaskExecution succeeded = new TaskExecution();
+        succeeded.setTaskId(taskId);
+        succeeded.setStatus(TaskExecutionStatus.SUCCESS);
+        when(taskExecutionRepo.findByTaskId(taskId)).thenReturn(List.of(succeeded));
 
-        boolean result = taskExecutionService.cancelTaskExecution(executionId);
+        boolean result = taskExecutionService.cancelTaskExecution(taskId);
 
         assertThat(result).isFalse();
-        verify(taskExecutionRepo, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(taskExecutionRepo, never()).saveAll(org.mockito.ArgumentMatchers.<List<TaskExecution>>any());
+    }
+
+    @Test
+    void cancelTaskExecution_returnsFalseWhenTaskHasNoExecutionsAtAll() {
+        UUID taskId = UUID.randomUUID();
+        when(taskExecutionRepo.findByTaskId(taskId)).thenReturn(List.of());
+
+        boolean result = taskExecutionService.cancelTaskExecution(taskId);
+
+        assertThat(result).isFalse();
     }
 }
