@@ -14,16 +14,20 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.DTO.ClaimTaskResponse;
+import com.entity.Plan;
 import com.entity.Task;
 import com.entity.TaskExecution;
+import com.entity.Tenant;
 import com.enums.Enums.ClaimOutcome;
 import com.enums.Enums.ErrorType;
 import com.enums.Enums.TaskExecutionStatus;
 import com.enums.Enums.TaskStatus;
 import com.exception.TaskExecutionNotFoundException;
 import com.exception.WorkerNotFoundException;
+import com.repo.PlanRepo;
 import com.repo.TaskExecutionRepo;
 import com.repo.TaskRepo;
+import com.repo.TenantRepo;
 import com.repo.WorkerRepo;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,12 +46,16 @@ class WorkerTaskServiceTest {
     private TaskExecutionRepo taskExecutionRepo;
     @Mock
     private WorkerRepo workerRepo;
+    @Mock
+    private TenantRepo tenantRepo;
+    @Mock
+    private PlanRepo planRepo;
 
     private WorkerTaskService workerTaskService;
 
     @BeforeEach
     void setUp() {
-        workerTaskService = new WorkerTaskService(taskRepo, taskExecutionRepo, workerRepo);
+        workerTaskService = new WorkerTaskService(taskRepo, taskExecutionRepo, workerRepo, tenantRepo, planRepo);
     }
 
     @Test
@@ -191,5 +199,143 @@ class WorkerTaskServiceTest {
         assertThat(execution.getErrorMessage()).isEqualTo("boom");
         assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.RETRYING);
         assertThat(task.getRetryCount()).isEqualTo(2);
+    }
+
+    @Test
+    void completeExecution_marksTaskDeadWhenRetryCountReachesTenantOverride() {
+        UUID taskId = UUID.randomUUID();
+        UUID executionId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        TaskExecution execution = new TaskExecution();
+        execution.setId(executionId);
+        execution.setTaskId(taskId);
+        Task task = new Task();
+        task.setId(taskId);
+        task.setTenantId(tenantId);
+        task.setRetryCount(1); // about to become 2
+        Tenant tenant = new Tenant();
+        tenant.setPlanId(planId);
+        tenant.setMaxRetriesOverride(2); // below the plan's ceiling, so the override is the binding limit
+        Plan plan = new Plan();
+        plan.setMaxRetries(10);
+        when(taskExecutionRepo.findById(executionId)).thenReturn(Optional.of(execution));
+        when(taskRepo.findById(taskId)).thenReturn(Optional.of(task));
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(planRepo.findById(planId)).thenReturn(Optional.of(plan));
+
+        workerTaskService.completeExecution(UUID.randomUUID(), taskId, executionId, false, ErrorType.TRANSIENT, "boom");
+
+        assertThat(task.getRetryCount()).isEqualTo(2);
+        assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.DEAD);
+        assertThat(task.getMovedToDlqAt()).isNotNull();
+    }
+
+    @Test
+    void completeExecution_clampsOverrideToPlanMaxRetriesWhenOverrideExceedsPlanLimit() {
+        UUID taskId = UUID.randomUUID();
+        UUID executionId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        TaskExecution execution = new TaskExecution();
+        execution.setId(executionId);
+        execution.setTaskId(taskId);
+        Task task = new Task();
+        task.setId(taskId);
+        task.setTenantId(tenantId);
+        task.setRetryCount(2); // about to become 3, matching the plan's ceiling — not the override's 10
+        Tenant tenant = new Tenant();
+        tenant.setPlanId(planId);
+        tenant.setMaxRetriesOverride(10); // deliberately higher than the plan allows
+        Plan plan = new Plan();
+        plan.setMaxRetries(3);
+        when(taskExecutionRepo.findById(executionId)).thenReturn(Optional.of(execution));
+        when(taskRepo.findById(taskId)).thenReturn(Optional.of(task));
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(planRepo.findById(planId)).thenReturn(Optional.of(plan));
+
+        workerTaskService.completeExecution(UUID.randomUUID(), taskId, executionId, false, ErrorType.TRANSIENT, "boom");
+
+        // The plan's lower ceiling (3) wins over the tenant's inflated override (10) — an override
+        // can only ever reduce the effective limit, never raise it above what the plan allows.
+        assertThat(task.getRetryCount()).isEqualTo(3);
+        assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.DEAD);
+        assertThat(task.getMovedToDlqAt()).isNotNull();
+    }
+
+    @Test
+    void completeExecution_staysRetryingWhenBelowTenantOverride() {
+        UUID taskId = UUID.randomUUID();
+        UUID executionId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        TaskExecution execution = new TaskExecution();
+        execution.setId(executionId);
+        execution.setTaskId(taskId);
+        Task task = new Task();
+        task.setId(taskId);
+        task.setTenantId(tenantId);
+        task.setRetryCount(1); // about to become 2, still under the override of 5
+        Tenant tenant = new Tenant();
+        tenant.setMaxRetriesOverride(5);
+        when(taskExecutionRepo.findById(executionId)).thenReturn(Optional.of(execution));
+        when(taskRepo.findById(taskId)).thenReturn(Optional.of(task));
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        workerTaskService.completeExecution(UUID.randomUUID(), taskId, executionId, false, ErrorType.TRANSIENT, "boom");
+
+        assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.RETRYING);
+        assertThat(task.getMovedToDlqAt()).isNull();
+    }
+
+    @Test
+    void completeExecution_fallsBackToPlanMaxRetriesWhenTenantOverrideIsZero() {
+        UUID taskId = UUID.randomUUID();
+        UUID executionId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        TaskExecution execution = new TaskExecution();
+        execution.setId(executionId);
+        execution.setTaskId(taskId);
+        Task task = new Task();
+        task.setId(taskId);
+        task.setTenantId(tenantId);
+        task.setRetryCount(2); // about to become 3, matching the plan's max
+        Tenant tenant = new Tenant();
+        tenant.setPlanId(planId);
+        tenant.setMaxRetriesOverride(0); // 0 = no override, per Tenant.maxRetriesOverride's convention
+        Plan plan = new Plan();
+        plan.setMaxRetries(3);
+        when(taskExecutionRepo.findById(executionId)).thenReturn(Optional.of(execution));
+        when(taskRepo.findById(taskId)).thenReturn(Optional.of(task));
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(planRepo.findById(planId)).thenReturn(Optional.of(plan));
+
+        workerTaskService.completeExecution(UUID.randomUUID(), taskId, executionId, false, ErrorType.TRANSIENT, "boom");
+
+        assertThat(task.getRetryCount()).isEqualTo(3);
+        assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.DEAD);
+        assertThat(task.getMovedToDlqAt()).isNotNull();
+    }
+
+    @Test
+    void completeExecution_staysRetryingWhenTenantOrPlanCannotBeResolved() {
+        UUID taskId = UUID.randomUUID();
+        UUID executionId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        TaskExecution execution = new TaskExecution();
+        execution.setId(executionId);
+        execution.setTaskId(taskId);
+        Task task = new Task();
+        task.setId(taskId);
+        task.setTenantId(tenantId);
+        task.setRetryCount(1);
+        when(taskExecutionRepo.findById(executionId)).thenReturn(Optional.of(execution));
+        when(taskRepo.findById(taskId)).thenReturn(Optional.of(task));
+        when(tenantRepo.findById(tenantId)).thenReturn(Optional.empty());
+
+        workerTaskService.completeExecution(UUID.randomUUID(), taskId, executionId, false, ErrorType.TRANSIENT, "boom");
+
+        assertThat(task.getTaskStatus()).isEqualTo(TaskStatus.RETRYING);
+        assertThat(task.getMovedToDlqAt()).isNull();
     }
 }
