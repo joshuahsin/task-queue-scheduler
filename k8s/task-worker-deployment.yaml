@@ -1,7 +1,7 @@
 # Build + load into minikube before applying:
 #   eval $(minikube docker-env)
 #   docker build -t task-worker:local -f task-worker/Dockerfile .
-#   kubectl apply -f k8s/secret.yaml -f k8s/task-worker-deployment.yaml
+#   kubectl apply -f k8s/configmap.yaml -f k8s/secret.yaml -f k8s/task-worker-deployment.yaml
 #
 # 2 replicas so you can actually observe one going OFFLINE while the other keeps registering/
 # heartbeating independently — see the plan's verification steps for the graceful-vs-crash scenarios.
@@ -27,6 +27,8 @@ spec:
           image: task-worker:local
           imagePullPolicy: IfNotPresent
           envFrom:
+            - configMapRef:
+                name: task-queue-config
             - secretRef:
                 name: task-queue-secrets
           env:

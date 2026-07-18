@@ -1,0 +1,19 @@
+# Non-sensitive configuration — safe to commit as real values (unlike secret.yaml, this doesn't
+# need .example treatment or a .gitignore entry). Split out from the Secret so RBAC/audit/
+# encryption-at-rest policies that specifically target Secrets don't need to cover values that
+# were never actually sensitive — an OCID or a Redis hostname doesn't grant access on its own,
+# unlike a password or connection string that embeds credentials.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-queue-config
+data:
+  OCI_REGION: "us-sanjose-1"
+  OCI_QUEUE_HIGH_PRIORITY_OCID: "ocid1.queue.oc1.us-sanjose-1.amaaaaaa6lvz7eiacj7gquemy3kj4hbt35jflktakmeutk3zefyvqbpof3sq"
+  OCI_QUEUE_DEFAULT_PRIORITY_OCID: "ocid1.queue.oc1.us-sanjose-1.amaaaaaa6lvz7eiabzlb6hos26or2ttj5klb5kpdlw25omkabhf4vggddbxq"
+  # Matches OCI_QUEUE_HIGH_PRIORITY_OCID above, since task-worker-deployment.yaml sets
+  # WORKER_QUEUE_TYPE=HIGH_PRIORITY for this reference setup — update both together if you change
+  # which queue task-worker is assigned to.
+  WORKER_QUEUE_OCID: "ocid1.queue.oc1.us-sanjose-1.amaaaaaa6lvz7eiacj7gquemy3kj4hbt35jflktakmeutk3zefyvqbpof3sq"
+  REDIS_HOST: "redis-10600.c289.us-west-1-2.ec2.cloud.redislabs.com"
+  REDIS_PORT: "10600"

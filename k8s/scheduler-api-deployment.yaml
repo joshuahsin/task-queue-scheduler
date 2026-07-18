@@ -1,7 +1,7 @@
 # Build + load into minikube before applying:
 #   eval $(minikube docker-env)
 #   docker build -t scheduler-api:local -f scheduler-api/Dockerfile .
-#   kubectl apply -f k8s/secret.yaml -f k8s/scheduler-api-deployment.yaml
+#   kubectl apply -f k8s/configmap.yaml -f k8s/secret.yaml -f k8s/scheduler-api-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,6 +23,8 @@ spec:
           ports:
             - containerPort: 8080
           envFrom:
+            - configMapRef:
+                name: task-queue-config
             - secretRef:
                 name: task-queue-secrets
           env:
