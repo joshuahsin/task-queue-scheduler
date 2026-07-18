@@ -1,0 +1,42 @@
+# Build + load into minikube before applying:
+#   eval $(minikube docker-env)
+#   docker build -t scheduler-api:local -f scheduler-api/Dockerfile .
+#   kubectl apply -f k8s/secret.yaml -f k8s/scheduler-api-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scheduler-api
+  template:
+    metadata:
+      labels:
+        app: scheduler-api
+    spec:
+      containers:
+        - name: scheduler-api
+          image: scheduler-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: task-queue-secrets
+          env:
+            - name: OCI_AUTH_METHOD
+              value: "config-file"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # Stable in-cluster DNS name — task-worker points SCHEDULER_API_BASE_URL at this.
+  name: scheduler-api
+spec:
+  selector:
+    app: scheduler-api
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -76,6 +77,26 @@ class WorkerControllerTest extends AbstractControllerTest {
         when(workerService.heartbeatWorker(workerId)).thenReturn(false);
 
         mockMvc.perform(post("/api/v1/workers/" + workerId + "/heartbeat")
+                        .header("Authorization", adminToken(UUID.randomUUID())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deregisterWorker_returns204WhenFound() throws Exception {
+        UUID workerId = UUID.randomUUID();
+        when(workerService.deregisterWorker(workerId)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/v1/workers/" + workerId)
+                        .header("Authorization", adminToken(UUID.randomUUID())))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deregisterWorker_returns404WhenNotFound() throws Exception {
+        UUID workerId = UUID.randomUUID();
+        when(workerService.deregisterWorker(workerId)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/v1/workers/" + workerId)
                         .header("Authorization", adminToken(UUID.randomUUID())))
                 .andExpect(status().isNotFound());
     }

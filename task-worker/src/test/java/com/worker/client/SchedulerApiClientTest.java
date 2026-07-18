@@ -66,6 +66,18 @@ class SchedulerApiClientTest {
     }
 
     @Test
+    void deregister_sendsDeleteForGivenWorker() {
+        UUID workerId = UUID.randomUUID();
+        mockServer.expect(requestTo(BASE_URL + "/api/v1/workers/" + workerId))
+                .andExpect(method(HttpMethod.DELETE))
+                .andRespond(withNoContent());
+
+        schedulerApiClient.deregister(workerId);
+
+        mockServer.verify();
+    }
+
+    @Test
     void claim_postsToClaimEndpointAndReturnsParsedResponse() {
         UUID workerId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();

@@ -1,0 +1,38 @@
+# Build + load into minikube before applying:
+#   eval $(minikube docker-env)
+#   docker build -t task-worker:local -f task-worker/Dockerfile .
+#   kubectl apply -f k8s/secret.yaml -f k8s/task-worker-deployment.yaml
+#
+# 2 replicas so you can actually observe one going OFFLINE while the other keeps registering/
+# heartbeating independently — see the plan's verification steps for the graceful-vs-crash scenarios.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: task-worker
+  template:
+    metadata:
+      labels:
+        app: task-worker
+    spec:
+      # Long enough for WorkerShutdownHandler's @PreDestroy deregister call to actually complete
+      # before Kubernetes gives up waiting and sends SIGKILL.
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: task-worker
+          image: task-worker:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: task-queue-secrets
+          env:
+            - name: SCHEDULER_API_BASE_URL
+              value: "http://scheduler-api:8080"
+            - name: WORKER_QUEUE_TYPE
+              value: "HIGH_PRIORITY"
+            - name: OCI_AUTH_METHOD
+              value: "config-file"

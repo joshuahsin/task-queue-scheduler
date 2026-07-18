@@ -35,6 +35,13 @@ public class SchedulerApiClient {
                 .toBodilessEntity();
     }
 
+    public void deregister(UUID workerId) {
+        restClient.delete()
+                .uri("/api/v1/workers/{workerId}", workerId)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     public ClaimTaskResponse claim(UUID workerId, UUID taskId) {
         return restClient.post()
                 .uri("/api/v1/workers/{workerId}/tasks/{taskId}/claim", workerId, taskId)

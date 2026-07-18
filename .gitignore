@@ -4,6 +4,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .env
+k8s/secret.yaml
 
 ### STS ###
 .apt_generated

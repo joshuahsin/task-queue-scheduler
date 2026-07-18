@@ -1,5 +1,6 @@
 package com.service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +28,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class WorkerServiceTest {
 
+    private static final long UNHEALTHY_AFTER_MS = 90_000L;
+    private static final long OFFLINE_AFTER_MS = 300_000L;
+
     @Mock
     private WorkerRepo workerRepo;
     @Mock
@@ -36,7 +40,7 @@ class WorkerServiceTest {
 
     @BeforeEach
     void setUp() {
-        workerService = new WorkerService(workerRepo, taskExecutionRepo);
+        workerService = new WorkerService(workerRepo, taskExecutionRepo, UNHEALTHY_AFTER_MS, OFFLINE_AFTER_MS);
     }
 
     @Test
@@ -122,5 +126,103 @@ class WorkerServiceTest {
         ArgumentCaptor<List<UUID>> captor = ArgumentCaptor.forClass(List.class);
         verify(taskExecutionRepo).findByWorkerIdIn(captor.capture());
         assertThat(captor.getValue()).containsExactly(workerId);
+    }
+
+    @Test
+    void deregisterWorker_setsOfflineWhenFound() {
+        UUID workerId = UUID.randomUUID();
+        Worker worker = new Worker();
+        worker.setId(workerId);
+        worker.setStatus(WorkerStatus.ONLINE);
+        when(workerRepo.findById(workerId)).thenReturn(Optional.of(worker));
+
+        boolean result = workerService.deregisterWorker(workerId);
+
+        assertThat(result).isTrue();
+        assertThat(worker.getStatus()).isEqualTo(WorkerStatus.OFFLINE);
+        verify(workerRepo).save(worker);
+    }
+
+    @Test
+    void deregisterWorker_returnsFalseWhenNotFound() {
+        UUID workerId = UUID.randomUUID();
+        when(workerRepo.findById(workerId)).thenReturn(Optional.empty());
+
+        assertThat(workerService.deregisterWorker(workerId)).isFalse();
+        verify(workerRepo, never()).save(any());
+    }
+
+    @Test
+    void sweepStaleWorkers_onlyQueriesOnlineAndUnhealthyWorkers() {
+        when(workerRepo.findByStatusIn(any())).thenReturn(List.of());
+
+        workerService.sweepStaleWorkers();
+
+        verify(workerRepo).findByStatusIn(List.of(WorkerStatus.ONLINE, WorkerStatus.UNHEALTHY));
+    }
+
+    @Test
+    void sweepStaleWorkers_marksOnlineWorkerOfflineWhenPastOfflineThreshold() {
+        Worker worker = new Worker();
+        worker.setStatus(WorkerStatus.ONLINE);
+        worker.setLastHeartbeat(Instant.now().minusMillis(OFFLINE_AFTER_MS + 1000));
+        when(workerRepo.findByStatusIn(any())).thenReturn(List.of(worker));
+
+        workerService.sweepStaleWorkers();
+
+        assertThat(worker.getStatus()).isEqualTo(WorkerStatus.OFFLINE);
+        verify(workerRepo).save(worker);
+    }
+
+    @Test
+    void sweepStaleWorkers_marksOnlineWorkerUnhealthyWhenPastUnhealthyButNotOfflineThreshold() {
+        Worker worker = new Worker();
+        worker.setStatus(WorkerStatus.ONLINE);
+        worker.setLastHeartbeat(Instant.now().minusMillis(UNHEALTHY_AFTER_MS + 1000));
+        when(workerRepo.findByStatusIn(any())).thenReturn(List.of(worker));
+
+        workerService.sweepStaleWorkers();
+
+        assertThat(worker.getStatus()).isEqualTo(WorkerStatus.UNHEALTHY);
+        verify(workerRepo).save(worker);
+    }
+
+    @Test
+    void sweepStaleWorkers_leavesRecentlyHeartbeatedWorkerUntouched() {
+        Worker worker = new Worker();
+        worker.setStatus(WorkerStatus.ONLINE);
+        worker.setLastHeartbeat(Instant.now());
+        when(workerRepo.findByStatusIn(any())).thenReturn(List.of(worker));
+
+        workerService.sweepStaleWorkers();
+
+        assertThat(worker.getStatus()).isEqualTo(WorkerStatus.ONLINE);
+        verify(workerRepo, never()).save(any());
+    }
+
+    @Test
+    void sweepStaleWorkers_progressesAlreadyUnhealthyWorkerToOfflineWhenPastOfflineThreshold() {
+        Worker worker = new Worker();
+        worker.setStatus(WorkerStatus.UNHEALTHY);
+        worker.setLastHeartbeat(Instant.now().minusMillis(OFFLINE_AFTER_MS + 1000));
+        when(workerRepo.findByStatusIn(any())).thenReturn(List.of(worker));
+
+        workerService.sweepStaleWorkers();
+
+        assertThat(worker.getStatus()).isEqualTo(WorkerStatus.OFFLINE);
+        verify(workerRepo).save(worker);
+    }
+
+    @Test
+    void sweepStaleWorkers_leavesAlreadyUnhealthyWorkerAloneWhenStillWithinOfflineThreshold() {
+        Worker worker = new Worker();
+        worker.setStatus(WorkerStatus.UNHEALTHY);
+        worker.setLastHeartbeat(Instant.now().minusMillis(UNHEALTHY_AFTER_MS + 1000));
+        when(workerRepo.findByStatusIn(any())).thenReturn(List.of(worker));
+
+        workerService.sweepStaleWorkers();
+
+        assertThat(worker.getStatus()).isEqualTo(WorkerStatus.UNHEALTHY);
+        verify(workerRepo, never()).save(any());
     }
 }
